@@ -1,0 +1,53 @@
+package com.mydea.mydea_backend.work.service;
+
+import com.mydea.mydea_backend.work.domain.Work;
+import com.mydea.mydea_backend.work.repo.WorkRepository;
+import com.mydea.mydea_backend.work.dto.WorkRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class WorkService {
+
+    private final WorkRepository workRepository;
+
+    @Transactional
+    public Work create(WorkRequest req) {
+        validate(req);
+        Work entity = mapToEntity(req);
+        return workRepository.save(entity);
+    }
+
+    private void validate(WorkRequest req) {
+        // designType이 flower면 꽃 컬러 필수
+        if (req.designType() == Work.DesignType.flower) {
+            if (req.flowerPetal() == null || req.flowerCenter() == null) {
+                throw new IllegalArgumentException("flower 디자인은 flowerPetal, flowerCenter가 필요합니다.");
+            }
+        }
+        // ring인데 완전 수동(autoSize=0)이고 radius도 없고 sizeIndex도 없으면 경고
+        if (req.workType() == Work.WorkType.ring
+                && (req.autoSize() == 0)
+                && req.radiusMm() == null
+                && req.sizeIndex() == null) {
+            throw new IllegalArgumentException("ring 수동 사이즈 저장 시 radiusMm 또는 sizeIndex 중 하나는 필요합니다.");
+        }
+    }
+
+    private Work mapToEntity(WorkRequest r) {
+        return Work.builder()
+                .userId(r.userId())
+                .name(r.name())
+                .workType(r.workType())
+                .designType(r.designType())
+                .colors(r.colors())
+                .flowerPetal(r.flowerPetal())
+                .flowerCenter(r.flowerCenter())
+                .autoSize(r.autoSize())
+                .radiusMm(r.radiusMm())
+                .sizeIndex(r.sizeIndex())
+                .build();
+    }
+}
