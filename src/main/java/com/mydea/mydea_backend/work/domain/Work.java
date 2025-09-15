@@ -32,6 +32,9 @@ public class Work {
 
     private String name;
 
+    @Column(name = "preview_url", length = 500)
+    private String previewUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "work_type", nullable = false, length = 16)
     private WorkType workType;

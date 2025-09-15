@@ -40,7 +40,7 @@ class WorkControllerTest {
     }
 
     @Autowired
-    WorkService workService; // 여기서는 mock 주입됨
+    WorkService workService;
 
     @Test
     void create_returns_200() throws Exception {
