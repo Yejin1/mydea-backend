@@ -12,9 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +53,7 @@ jobs:
           app-name: 'mydea-backend'
           slot-name: 'Production'
           package: '*.jar'
+
 
 
 
