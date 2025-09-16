@@ -1,12 +1,8 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy JAR app to Azure Web App - mydea-backend
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -15,20 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java version
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
+          cache: 'gradle'
 
-      - name: Build with Maven
-        run: mvn -B -DskipTests clean package
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build (Gradle)
+        run: ./gradlew -x test bootJar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: java-app
-          path: 'target/*.jar'
+          path: build/libs/*.jar 
 
   deploy:
     runs-on: ubuntu-latest
@@ -40,11 +40,11 @@ jobs:
           name: java-app
           path: .
 
-      - name: Login to Azure
+      - name: Azure login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A96896ACE8F84C5DA8F6E4EA48DCD142 }} 
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E38722500C654105B16265769E4826C1 }} 
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A96896ACE8F84C5DA8F6E4EA48DCD142 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E38722500C654105B16265769E4826C1 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E70A5BF10B374644898B97184D148414 }}
 
       - name: Deploy to Azure Web App
@@ -53,8 +53,3 @@ jobs:
           app-name: 'mydea-backend'
           slot-name: 'Production'
           package: '*.jar'
-
-
-
-
-
