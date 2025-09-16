@@ -1,5 +1,6 @@
 package com.mydea.mydea_backend.work.service;
 
+import com.mydea.mydea_backend.storage.BlobSasService;
 import com.mydea.mydea_backend.work.domain.Work;
 import com.mydea.mydea_backend.work.repo.WorkRepository;
 import com.mydea.mydea_backend.work.dto.WorkRequest;
@@ -7,11 +8,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class WorkService {
 
     private final WorkRepository workRepository;
+    private final BlobSasService blobSasService;
 
     @Transactional
     public Work create(WorkRequest req) {
@@ -49,5 +53,17 @@ public class WorkService {
                 .radiusMm(r.radiusMm())
                 .sizeIndex(r.sizeIndex())
                 .build();
+    }
+
+    @Transactional
+    public void deleteWorks(List<Long> ids) {
+        // TODO: Blob Storage에서도 previewUrl 삭제해야함
+        List<Work> works = workRepository.findAllById(ids);
+        works.forEach(w -> {
+            if (w.getPreviewUrl() != null) {
+                //blobServiceClient.getBlobContainerClient(...).getBlobClient(...).deleteIfExists();
+            }
+        });
+        workRepository.deleteAllByIdIn(ids);
     }
 }

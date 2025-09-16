@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,5 +21,11 @@ public class WorkController {
     public ResponseEntity<WorkResponse> create(@Valid @RequestBody WorkRequest req) {
         Work saved = workService.create(req);
         return ResponseEntity.ok(WorkResponse.from(saved));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> delete(@RequestBody List<Long> ids) {
+        workService.deleteWorks(ids);
+        return ResponseEntity.noContent().build();
     }
 }

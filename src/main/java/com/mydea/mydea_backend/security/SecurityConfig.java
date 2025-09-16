@@ -44,7 +44,8 @@ public class SecurityConfig {
         // 프론트 도메인들 추가 (로컬 + 배포)
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "https://mydea.vercel.app"
+                "https://mydea.co.kr",
+                "https://mydea-frontend-a0dferfmgacmeedy.koreasouth-01.azurewebsites.net"
         ));
         // 쿠키/Authorization 헤더를 쓸 거면 true
         cfg.setAllowCredentials(true);

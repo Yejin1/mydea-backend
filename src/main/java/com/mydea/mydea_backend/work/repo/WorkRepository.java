@@ -5,6 +5,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface WorkRepository extends JpaRepository<Work, Long> {
+
     Page<Work> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+    void deleteAllByIdIn(List<Long> ids);
 }
