@@ -30,6 +30,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.flywaydb:flyway-core")
 	implementation("org.flywaydb:flyway-mysql")
+	implementation("com.azure:azure-storage-blob:12.27.0")
 
 	runtimeOnly("com.mysql:mysql-connector-j")
 

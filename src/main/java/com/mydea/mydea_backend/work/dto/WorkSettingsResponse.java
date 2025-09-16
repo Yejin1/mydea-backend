@@ -5,30 +5,24 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record WorkSettingsResponse(
-        Long id,
-        Long userId,
-        String name,
-        String accessory,              // "ring" | "bracelet" | "necklace"
-        String design,                 // "basic" | "flower"
-        List<String> colors,           // ["#feadad", ...]
-        FlowerColors flowerColors,     // {petal:"#...", center:"#..."}
+        Long id, Long userId, String name,
+        String workType, String designType,
+        List<String> colors,
+        FlowerColors flowerColors,
         Integer autoSize,
         BigDecimal radiusMm,
-        Integer sizeIndex
+        Integer sizeIndex,
+        String signedPreviewUrl // ← 추가
 ) {
     public record FlowerColors(String petal, String center) {}
-    public static WorkSettingsResponse from(Work w) {
+    public static WorkSettingsResponse of(Work w, String signedPreviewUrl) {
         return new WorkSettingsResponse(
-                w.getId(),
-                w.getUserId(),
-                w.getName(),
-                w.getWorkType().name(),
-                w.getDesignType().name(),
+                w.getId(), w.getUserId(), w.getName(),
+                w.getWorkType().name(), w.getDesignType().name(),
                 w.getColors(),
                 new FlowerColors(w.getFlowerPetal(), w.getFlowerCenter()),
-                w.getAutoSize(),
-                w.getRadiusMm(),
-                w.getSizeIndex()
+                w.getAutoSize(), w.getRadiusMm(), w.getSizeIndex(),
+                signedPreviewUrl
         );
     }
 }

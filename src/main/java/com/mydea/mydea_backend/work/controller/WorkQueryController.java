@@ -27,20 +27,19 @@ public class WorkQueryController {
             @RequestParam(defaultValue = "20") int size
     ) {
         Page<Work> result = workQueryService.listByUser(userId, page, size);
-        Page<WorkListItemResponse> mapped = result.map(WorkListItemResponse::from);
+        Page<WorkListItemResponse> mapped = result.map(w ->
+                WorkListItemResponse.of(w, workQueryService.signPreviewUrlOrNull(w)));
         return ResponseEntity.ok(mapped);
     }
-
     /**
      * 작업물 상세(설정값)
      * GET /api/works/{id}?userId=1
      */
     @GetMapping("/{id}")
-    public ResponseEntity<WorkSettingsResponse> get(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long userId // 인증 붙이면 제거
-    ) {
+    public ResponseEntity<WorkSettingsResponse> get(@PathVariable Long id,
+                                                    @RequestParam(required = false) Long userId) {
         Work w = workQueryService.getOrThrow(id, userId);
-        return ResponseEntity.ok(WorkSettingsResponse.from(w));
+        String signed = workQueryService.signPreviewUrlOrNull(w);
+        return ResponseEntity.ok(WorkSettingsResponse.of(w, signed));
     }
 }
