@@ -46,9 +46,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_... }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_... }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_... }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A96896ACE8F84C5DA8F6E4EA48DCD142 }} 
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E38722500C654105B16265769E4826C1 }} 
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E70A5BF10B374644898B97184D148414 }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
@@ -56,5 +56,6 @@ jobs:
           app-name: 'mydea-backend'
           slot-name: 'Production'
           package: '*.jar'
+
 
 
