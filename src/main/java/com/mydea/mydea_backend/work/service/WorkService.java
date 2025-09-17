@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
@@ -65,5 +66,13 @@ public class WorkService {
             }
         });
         workRepository.deleteAllByIdIn(ids);
+    }
+
+    @Transactional
+    public void updatePreviewUrl(Long id, String previewUrl) {
+        Work work = workRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("작업물 없음: id=" + id));
+        work.setPreviewUrl(previewUrl);
+        workRepository.save(work);
     }
 }

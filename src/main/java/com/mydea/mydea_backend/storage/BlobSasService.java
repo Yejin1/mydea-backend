@@ -37,7 +37,7 @@ public class BlobSasService {
                 .setProtocol(SasProtocol.HTTPS_ONLY)
                 .setStartTime(now.minusMinutes(1)); // 시계 오차 보정
 
-        String sas = blob.generateSas(values); // sv=..&sr=b&sp=r&se=..&sig=..
+        String sas = blob.generateSas(values);
         return blob.getBlobUrl() + "?" + sas;
     }
 

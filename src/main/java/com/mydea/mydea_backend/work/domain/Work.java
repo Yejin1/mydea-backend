@@ -79,4 +79,8 @@ public class Work {
     }
     @PreUpdate
     void onUpdate() { updatedAt = Instant.now(); }
+
+    public void setPreviewUrl(String previewUrl) {
+        this.previewUrl = previewUrl;
+    }
 }
