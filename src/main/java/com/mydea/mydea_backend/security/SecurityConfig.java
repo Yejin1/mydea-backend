@@ -25,9 +25,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // ✅ CORS 활성화 (아래 bean 사용)
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/accounts/register").permitAll()
                         .requestMatchers("/api/works/**").permitAll()
@@ -41,7 +42,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        // 프론트 도메인들 추가 (로컬 + 배포)
+        // 프론트 도메인들 추가
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://mydea.co.kr",
