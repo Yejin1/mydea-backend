@@ -6,6 +6,7 @@ import com.mydea.mydea_backend.work.service.WorkQueryService;
 import com.mydea.mydea_backend.work.service.WorkService;
 import com.mydea.mydea_backend.work.dto.WorkRequest;
 import com.mydea.mydea_backend.work.dto.WorkResponse;
+import com.mydea.mydea_backend.work.dto.WorkUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,13 @@ public class WorkController {
     public ResponseEntity<WorkResponse> create(@Valid @RequestBody WorkRequest req) {
         Work saved = workService.create(req);
         return ResponseEntity.ok(WorkResponse.from(saved));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<WorkResponse> update(@PathVariable Long id,
+                                               @Valid @RequestBody WorkUpdateRequest req) {
+        Work updated = workService.update(id, req);
+        return ResponseEntity.ok(WorkResponse.from(updated));
     }
 
     @DeleteMapping

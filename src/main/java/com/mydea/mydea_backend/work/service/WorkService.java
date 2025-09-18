@@ -2,6 +2,7 @@ package com.mydea.mydea_backend.work.service;
 
 import com.mydea.mydea_backend.storage.BlobSasService;
 import com.mydea.mydea_backend.work.domain.Work;
+import com.mydea.mydea_backend.work.dto.WorkUpdateRequest;
 import com.mydea.mydea_backend.work.repo.WorkRepository;
 import com.mydea.mydea_backend.work.dto.WorkRequest;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,38 @@ public class WorkService {
             throw new IllegalArgumentException("ring 수동 사이즈 저장 시 radiusMm 또는 sizeIndex 중 하나는 필요합니다.");
         }
     }
+
+    @Transactional
+    public Work update(Long id, WorkUpdateRequest r) {
+        Work w = workRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("작업물 없음: id=" + id));
+
+        // 검증: flower면 두 컬러 필요
+        if (r.designType() == Work.DesignType.flower &&
+                (r.flowerPetal() == null || r.flowerCenter() == null)) {
+            throw new IllegalArgumentException("flower 디자인은 flowerPetal/flowerCenter가 필요합니다.");
+        }
+        // ring 수동 사이즈면 radius 또는 sizeIndex 중 하나 필요
+        if (r.workType() == Work.WorkType.ring &&
+                r.autoSize() != null && r.autoSize() == 0 &&
+                r.radiusMm() == null && r.sizeIndex() == null) {
+            throw new IllegalArgumentException("ring 수동 사이즈: radiusMm 또는 sizeIndex 필요");
+        }
+
+        // 전체 업데이트 (PUT)
+        w.setName(r.name());
+        w.setWorkType(r.workType());
+        w.setDesignType(r.designType());
+        w.setColors(r.colors());
+        w.setFlowerPetal(r.flowerPetal());
+        w.setFlowerCenter(r.flowerCenter());
+        w.setAutoSize(r.autoSize());
+        w.setRadiusMm(r.radiusMm());
+        w.setSizeIndex(r.sizeIndex());
+
+        return workRepository.save(w);
+    }
+
 
     private Work mapToEntity(WorkRequest r) {
         return Work.builder()

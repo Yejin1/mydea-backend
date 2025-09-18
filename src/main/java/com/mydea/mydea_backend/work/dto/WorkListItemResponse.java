@@ -8,7 +8,7 @@ public record WorkListItemResponse(
         String name,
         String workType,
         String designType,
-        String signedPreviewUrl, // ← 읽기 전용 SAS가 붙은 URL
+        String signedPreviewUrl, //읽기 전용 SAS가 붙은 URL
         Instant createdAt,
         Instant updatedAt
 ) {
