@@ -1,6 +1,7 @@
 
 -- users (계정) 테이블
-CREATE TABLE `users` (
+
+CREATE TABLE IF NOT EXISTS `users` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `login_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `email` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
@@ -19,8 +20,8 @@ CREATE TABLE `users` (
   KEY `idx_users_created_at` (`created_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---주소지 관리 테이블
-CREATE TABLE `addresses` (
+-- address(주소) 테이블
+CREATE TABLE IF NOT EXISTS `addresses` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `user_id` bigint NOT NULL,
   `alias` varchar(50) DEFAULT NULL,
@@ -36,6 +37,7 @@ CREATE TABLE `addresses` (
   KEY `fk_address_user` (`user_id`),
   CONSTRAINT `fk_address_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 
 -- works (작업물) 테이블
 CREATE TABLE IF NOT EXISTS works (
