@@ -3,67 +3,120 @@ package com.mydea.mydea_backend.account.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
+import org.hibernate.annotations.Comment;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(
         name = "users",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_users_email", columnNames = "email")
-        },
         indexes = {
                 @Index(name = "idx_users_created_at", columnList = "created_at")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_login_id", columnNames = {"login_id"})
         }
 )
-@EntityListeners(AuditingEntityListener.class)
 public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 로그인용 별도 아이디 (UNIQUE) */
+    @NotBlank
+    @Size(max = 50)
+    @Column(name = "login_id", length = 50, nullable = false)
+    private String loginId;
+
+    /** 이메일 (DB에서 UNIQUE 강제는 아님: 운영 전략에 따라 선택) */
     @Email
     @NotBlank
-    @Column(nullable = false, length = 255)
+    @Size(max = 255)
+    @Column(name = "email", length = 255, nullable = false)
     private String email;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
+    /** BCrypt 해시 저장 (보통 60~100자) */
     @NotBlank
-    @Column(name = "password_hash", nullable = false, length = 255)
-    private String passwordHash;
+    @Size(max = 255)
+    @Column(name = "password", length = 255, nullable = false)
+    private String password;
 
     @NotBlank
-    @Column(nullable = false, length = 100)
+    @Size(max = 100)
+    @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column(length = 30)
+    @Size(max = 30)
+    @Column(name = "phone", length = 30)
     private String phone;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Role role = Role.USER;
+    @Column(name = "phone_verified", nullable = false)
+    private boolean phoneVerified;
 
+    /** 권한: USER / ADMIN */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private AccountStatus status = AccountStatus.ACTIVE;
+    @Column(name = "role", length = 20, nullable = false)
+    private Role role;
 
+    /** 계정상태: ACTIVE / SUSPENDED / DELETED 등 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private AccountStatus status;
+
+    /** 마지막 로그인 시각 */
     @Column(name = "last_login_at")
-    private Instant lastLoginAt;
+    private LocalDateTime lastLoginAt;
 
+    /** 생성/수정 시간 (DB DEFAULT + JPA Auditing 겸용) */
     @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-}
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
+    /** 사용자 1:N 주소 */
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Address> addresses = new ArrayList<>();
+
+    /** 편의 메서드 */
+    public void addAddress(Address address) {
+        addresses.add(address);
+        address.setUser(this);
+    }
+
+    public void removeAddress(Address address) {
+        addresses.remove(address);
+        address.setUser(null);
+    }
+
+    /** 로그인 성공 시점 갱신 편의 메서드 */
+    public void touchLastLoginAt() {
+        this.lastLoginAt = LocalDateTime.now();
+    }
+
+    /** 기본값 세팅 (DB DEFAULT와 중복되더라도 안전) */
+    @PrePersist
+    void prePersist() {
+        if (this.role == null) this.role = Role.USER;
+        if (this.status == null) this.status = AccountStatus.ACTIVE;
+    }
+}
