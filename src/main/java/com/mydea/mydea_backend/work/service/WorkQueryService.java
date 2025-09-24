@@ -36,4 +36,10 @@ public class WorkQueryService {
         }
         return w;
     }
+
+    public Work getPreset(Long id) {
+        Work w = workRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("작업물을 찾을 수 없습니다: id=" + id));
+        return w;
+    }
 }

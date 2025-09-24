@@ -20,9 +20,10 @@ public class WorkService {
     private final BlobSasService blobSasService;
 
     @Transactional
-    public Work create(WorkRequest req) {
+    public Work create(WorkRequest req, Long userId) {
         validate(req);
         Work entity = mapToEntity(req);
+        entity.setUserId(userId);
         return workRepository.save(entity);
     }
 

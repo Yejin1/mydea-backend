@@ -79,7 +79,7 @@ class WorkServiceTest {
             return arg;
         });
 
-        Work saved = workService.create(validCreateReqRingManualWithRadius);
+        Work saved = workService.create(validCreateReqRingManualWithRadius,1L);
 
         assertNotNull(saved);
         assertEquals(100L, saved.getId());
@@ -102,7 +102,7 @@ class WorkServiceTest {
             return arg;
         });
 
-        Work saved = workService.create(validCreateReqFlower);
+        Work saved = workService.create(validCreateReqFlower,1L);
 
         assertEquals(101L, saved.getId());
         then(workRepository).should().save(any(Work.class));
@@ -117,7 +117,7 @@ class WorkServiceTest {
         );
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> workService.create(bad));
+                () -> workService.create(bad,1L));
         assertTrue(ex.getMessage().contains("flower"));
         then(workRepository).shouldHaveNoInteractions();
     }
@@ -131,7 +131,7 @@ class WorkServiceTest {
         );
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> workService.create(bad));
+                () -> workService.create(bad,1L));
         assertTrue(ex.getMessage().toLowerCase().contains("ring"));
         then(workRepository).shouldHaveNoInteractions();
     }

@@ -9,8 +9,12 @@ import com.mydea.mydea_backend.work.dto.WorkResponse;
 import com.mydea.mydea_backend.work.dto.WorkUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
@@ -25,8 +29,18 @@ public class WorkController {
     private final BlobSasService blobSasService;
 
     @PostMapping
-    public ResponseEntity<WorkResponse> create(@Valid @RequestBody WorkRequest req) {
-        Work saved = workService.create(req);
+    public ResponseEntity<WorkResponse> create(@Valid @RequestBody WorkRequest req,
+                                               Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated");
+        }
+        final Long userId;
+        try {
+            userId = Long.valueOf(auth.getName());
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid principal");
+        }
+        Work saved = workService.create(req, userId);
         return ResponseEntity.ok(WorkResponse.from(saved));
     }
 

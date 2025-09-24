@@ -41,25 +41,21 @@ public class Account {
     @Column(name = "login_id", length = 50, nullable = false)
     private String loginId;
 
-    /** 이메일 (DB에서 UNIQUE 강제는 아님: 운영 전략에 따라 선택) */
     @Email
-    @NotBlank
     @Size(max = 255)
-    @Column(name = "email", length = 255, nullable = false)
+    @Column(name = "email", length = 255)
     private String email;
 
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
 
-    /** BCrypt 해시 저장 (보통 60~100자) */
     @NotBlank
     @Size(max = 255)
     @Column(name = "password", length = 255, nullable = false)
     private String password;
 
-    @NotBlank
     @Size(max = 100)
-    @Column(name = "name", length = 100, nullable = false)
+    @Column(name = "name", length = 100)
     private String name;
 
     @Size(max = 30)
@@ -83,7 +79,6 @@ public class Account {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    /** 생성/수정 시간 (DB DEFAULT + JPA Auditing 겸용) */
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -3,61 +3,74 @@ package com.mydea.mydea_backend.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.*;
 
 import java.util.List;
 
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    private final JwtAuthFilter jwtAuthFilter;
+    private final JwtAuthEntryPoint authEntryPoint;
+    private final JwtAccessDeniedHandler accessDeniedHandler;
+
+    public SecurityConfig(
+            JwtAuthFilter jwtAuthFilter,
+            JwtAuthEntryPoint authEntryPoint,
+            JwtAccessDeniedHandler accessDeniedHandler
+    ) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.authEntryPoint = authEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(Customizer.withDefaults())
+        return http
+                // CORS: 브라우저에서 직접 칠 가능성 대비 (BFF면 서버-서버라 CORS 영향 없음)
+                .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(authEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("api/auth/login", "/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/check-login-id").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/signup").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/accounts/register").permitAll()
-                        .requestMatchers("/api/works/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
-                .httpBasic(Customizer.withDefaults());
-        return http.build();
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .httpBasic(h -> h.disable())
+                .formLogin(f -> f.disable())
+                .build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        // 프론트 도메인들 추가
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://mydea.co.kr",
                 "https://mydea-frontend-a0dferfmgacmeedy.koreasouth-01.azurewebsites.net"
         ));
-        // 쿠키/Authorization 헤더를 쓸 거면 true
         cfg.setAllowCredentials(true);
 
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
-        // 프론트에서 보낼 헤더들
         cfg.setAllowedHeaders(List.of(
-                "Content-Type","Authorization","x-requested-with","x-ms-blob-type"
+                "Content-Type","Authorization","X-Requested-With","X-MS-Blob-Type"
         ));
-        // 응답에서 프론트가 읽을 수 있게 노출할 헤더(필요시)
-        cfg.setExposedHeaders(List.of("Location"));
+        cfg.setExposedHeaders(List.of("Location","Content-Disposition"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);

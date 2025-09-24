@@ -125,7 +125,7 @@ class WorkControllerTest {
                 2,
                 "https://blob/works/100/preview.png"
         );
-        given(workService.create(any(WorkRequest.class))).willReturn(saved);
+        given(workService.create(any(WorkRequest.class),1L)).willReturn(saved);
 
         mvc.perform(post("/api/works")
                         .with(csrf())
