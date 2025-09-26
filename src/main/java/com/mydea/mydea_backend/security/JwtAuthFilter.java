@@ -18,7 +18,7 @@ import java.util.List;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider jwt; // ⬅️ 2-1) 아래
+    private final JwtTokenProvider jwt;
 
     public JwtAuthFilter(JwtTokenProvider jwt) {
         this.jwt = jwt;
@@ -33,8 +33,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(7);
 
             if (jwt.validate(token)) {
-                String userId = jwt.getUserId(token);              // sub 또는 커스텀 클레임
-                List<String> roles = jwt.getRoles(token);          // ["ROLE_USER", ...]
+                String userId = jwt.getUserId(token);
+                List<String> roles = jwt.getRoles(token);
                 List<SimpleGrantedAuthority> auths = roles.stream()
                         .map(SimpleGrantedAuthority::new).toList();
 

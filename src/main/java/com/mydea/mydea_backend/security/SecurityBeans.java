@@ -23,7 +23,7 @@ public class SecurityBeans {
     @Bean
     public JwtTokenProvider jwtTokenProvider(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-ttl-seconds:1800}") long ttl
+            @Value("${app.jwt.access-ttl-seconds:3600}") long ttl
     ) {
         return new JwtTokenProvider(secret, ttl);
     }
