@@ -89,4 +89,27 @@ public class CartService {
 
         itemRepository.deleteByCartId(cart.getCartId());
     }
+
+    @Transactional
+    public void updateQuantity(Long userId, Long itemId, int quantity) {
+        if (quantity < 0) throw new IllegalArgumentException("수량이 0보다 커야함");
+
+        // 본인 cart 조회 (없으면 에러)
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException("유저 아이디 없음 : " + userId));
+
+        // 소유 검증 포함 조회
+        CartItem item = itemRepository.findByCartItemIdAndCartId(itemId, cart.getCartId())
+                .orElseThrow(() -> new NotFoundException("장바구니 아이템 없음 : " + itemId));
+
+        // 0이면 삭제. 그 외에는 업데이트
+        if (quantity == 0) {
+            itemRepository.delete(item);
+            return;
+        }
+
+        item.setQuantity(quantity);
+        // 필요 시 updatedAt 갱신 컬럼 있으면 같이 갱신
+        itemRepository.save(item);
+    }
 }

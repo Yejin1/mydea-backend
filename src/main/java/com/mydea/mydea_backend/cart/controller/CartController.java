@@ -28,8 +28,8 @@ public class CartController {
 
     //장바구니 아이템 수량 변경 (미구현)
     @PatchMapping("/items/{itemId}")
-    public void updateQty(@PathVariable Long itemId, @RequestBody QuantityReq req){
-        //***해야함
+    public void updateQty(Authentication auth, @PathVariable Long itemId, @RequestBody QuantityReq req){
+        cartService.updateQuantity(Long.valueOf(auth.getName()), itemId, req.quantity());
     }
 
     //장바구니 아이템 삭제

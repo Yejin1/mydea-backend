@@ -31,7 +31,6 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                // CORS: 브라우저에서 직접 칠 가능성 대비 (BFF면 서버-서버라 CORS 영향 없음)
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -44,10 +43,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("api/auth/login", "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-login-id").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/works/*/preset").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/api/**").authenticated()
-                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(h -> h.disable())
