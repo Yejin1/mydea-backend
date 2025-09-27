@@ -1,7 +1,7 @@
 package com.mydea.mydea_backend.cart.dto;
 
 public record CartItemRes(
-        Long itemId,
+        Long cartItemId,
         Long workId,
         String optionHash,
         String name,

@@ -6,6 +6,7 @@ import com.mydea.mydea_backend.cart.dto.MergeReq;
 import com.mydea.mydea_backend.cart.dto.QuantityReq;
 import com.mydea.mydea_backend.cart.service.CartService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,13 +26,24 @@ public class CartController {
         cartService.addItem(Long.valueOf(auth.getName()), req);
     }
 
+    //장바구니 아이템 수량 변경 (미구현)
     @PatchMapping("/items/{itemId}")
     public void updateQty(@PathVariable Long itemId, @RequestBody QuantityReq req){
+        //***해야함
     }
 
+    //장바구니 아이템 삭제
     @DeleteMapping("/items/{itemId}")
-    public void remove(@PathVariable Long itemId){
-        // deleteById
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void remove(Authentication auth, @PathVariable Long itemId){
+        cartService.removeItem(Long.valueOf(auth.getName()), itemId);
+    }
+    
+    // 장바구니 전체 삭제
+    @DeleteMapping("/clear")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clear(Authentication auth) {
+        cartService.clearCart(Long.valueOf(auth.getName()));
     }
 
     @PostMapping("/merge")

@@ -108,7 +108,7 @@ public class Account {
         this.lastLoginAt = LocalDateTime.now();
     }
 
-    /** 기본값 세팅 (DB DEFAULT와 중복되더라도 안전) */
+    /** 기본값 세팅 */
     @PrePersist
     void prePersist() {
         if (this.role == null) this.role = Role.USER;

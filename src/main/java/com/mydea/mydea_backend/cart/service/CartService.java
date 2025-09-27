@@ -19,6 +19,7 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository itemRepository;
 
+    //장바구니 아이템 추가
     @Transactional
     public void addItem(Long userId, AddItemReq req) {
         Cart cart = cartRepository.findByUserId(userId)
@@ -32,15 +33,24 @@ public class CartService {
         itemRepository.save(item);
     }
 
-    @Transactional(readOnly=true)
+    //장바구니 목록 조회
+    @Transactional
     public CartRes getCart(Long userId) {
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> cartRepository.save(newCart(userId)));
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) return new CartRes(List.of(), 0, 0);
+
         List<CartItem> items = itemRepository.findByCartId(cart.getCartId());
+
+        if (items.isEmpty()) {
+            return new CartRes(List.of(), 0, 0);
+        }
+
         int total = items.stream().mapToInt(i -> i.getUnitPrice() * i.getQuantity()).sum();
         return CartMapper.toCartRes(items);
     }
 
+
+    //장바구니
     @Transactional
     public CartRes merge(Long userId, List<AddItemReq> localItems) {
         for (AddItemReq req : localItems) addItem(userId, req);
@@ -53,5 +63,30 @@ public class CartService {
         i.setCartId(cartId); i.setWorkId(r.workId()); i.setOptionHash(r.optionHash());
         i.setName(r.name()); i.setThumbUrl(r.thumbUrl()); i.setUnitPrice(r.unitPrice()); i.setQuantity(r.quantity());
         return i;
+    }
+
+    @Transactional
+    public void removeItem(Long userId, Long itemId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException("유저 아이디 없음 : " + userId));
+
+        // 삭제
+        int affected = itemRepository.deleteByCartIdAndCartItemId(cart.getCartId(), itemId);
+        if (affected == 0) {
+            // itemId가 없거나 남의 장바구니인 경우 익셉션
+            throw new NotFoundException("Cart item not found: " + itemId);
+        }
+
+    }
+
+    /**
+     * 장바구니 전체 비우기
+     */
+    @Transactional
+    public void clearCart(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException("유저 아이디 없음 : " + userId));
+
+        itemRepository.deleteByCartId(cart.getCartId());
     }
 }
