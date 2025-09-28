@@ -41,7 +41,7 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("api/auth/login", "/auth/refresh").permitAll()
+                        .requestMatchers("/api/auth/login", "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-login-id").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/works/*/preset").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup").permitAll()
