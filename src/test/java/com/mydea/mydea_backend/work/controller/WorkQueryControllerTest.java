@@ -3,10 +3,14 @@ package com.mydea.mydea_backend.work.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mydea.mydea_backend.work.domain.Work;
 import com.mydea.mydea_backend.work.service.WorkQueryService;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import com.mydea.mydea_backend.security.JwtTokenProvider;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.Page;
@@ -31,109 +35,114 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = WorkQueryController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@WithMockUser(username = "1", roles = "USER")
 class WorkQueryControllerTest {
 
-    @Autowired
-    MockMvc mvc;
+        @Autowired
+        MockMvc mvc;
 
-    @Autowired
-    ObjectMapper om;
+        @Autowired
+        ObjectMapper om;
 
-    @MockitoBean
-    WorkQueryService workQueryService;
+        @MockitoBean
+        WorkQueryService workQueryService;
 
-    // ---- helpers ----
-    private Work makeWork(Long id, Long userId, String name, String previewUrl) {
-        return Work.builder()
-                .id(id)
-                .userId(userId)
-                .name(name)
-                .workType(Work.WorkType.ring)
-                .designType(Work.DesignType.basic)
-                .colors(List.of("#ff0000"))
-                .flowerPetal("#00ff00")
-                .flowerCenter("#0000ff")
-                .autoSize(1)
-                .radiusMm(new BigDecimal("10.000"))
-                .sizeIndex(1)
-                .previewUrl(previewUrl)
-                .build();
-    }
+        @TestConfiguration
+        static class JwtStubConfig {
+                @Bean
+                JwtTokenProvider jwtTokenProvider() {
+                        return new JwtTokenProvider("0123456789012345678901234567890123456789", 3600);
+                }
+        }
 
-    // ---------- GET /api/works?userId=1&page=0&size=20 ----------
-    @Test
-    @DisplayName("GET /api/works - 목록 조회: service 결과를 DTO로 매핑하여 200 OK")
-    void list_ok() throws Exception {
-        Long userId = 1L;
-        int page = 0, size = 20;
+        // ---- helpers ----
+        private Work makeWork(Long id, Long userId, String name, String previewUrl) {
+                return Work.builder()
+                                .id(id)
+                                .userId(userId)
+                                .name(name)
+                                .workType(Work.WorkType.ring)
+                                .designType(Work.DesignType.basic)
+                                .colors(List.of("#ff0000"))
+                                .flowerPetal("#00ff00")
+                                .flowerCenter("#0000ff")
+                                .autoSize(1)
+                                .radiusMm(new BigDecimal("10.000"))
+                                .sizeIndex(1)
+                                .previewUrl(previewUrl)
+                                .build();
+        }
 
-        // given
-        Work w1 = makeWork(100L, userId, "w1", "https://blob/works/100/preview.png");
-        Page<Work> stubPage = new PageImpl<>(List.of(w1));
-        given(workQueryService.listByUser(eq(userId), eq(page), eq(size))).willReturn(stubPage);
-        given(workQueryService.signPreviewUrlOrNull(eq(w1)))
-                .willReturn("https://signed.example/works/100/preview.png?sig=abc");
+        // ---------- GET /api/works?userId=1&page=0&size=20 ----------
+        @Test
+        @DisplayName("GET /api/works - 목록 조회: service 결과를 DTO로 매핑하여 200 OK")
+        void list_ok() throws Exception {
+                Long userId = 1L;
+                int page = 0, size = 20;
 
-        // when/then
-        mvc.perform(get("/api/works")
-                        .param("userId", String.valueOf(userId))
-                        .param("page", String.valueOf(page))
-                        .param("size", String.valueOf(size))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                // 응답 본문에 서명 URL 일부가 포함되는지만 느슨하게 확인
-                .andExpect(content().string(containsString("signed.example")))
-                // Page 직렬화 시 content 배열이 포함되는지 확인 (Spring의 기본 Jackson 직렬화)
-                .andExpect(content().string(containsString("content")));
+                // given
+                Work w1 = makeWork(100L, userId, "w1", "https://blob/works/100/preview.png");
+                Page<Work> stubPage = new PageImpl<>(List.of(w1));
+                given(workQueryService.listByUser(eq(userId), eq(page), eq(size))).willReturn(stubPage);
+                given(workQueryService.signPreviewUrlOrNull(eq(w1)))
+                                .willReturn("https://signed.example/works/100/preview.png?sig=abc");
 
-        // 서비스 호출 검증
-        then(workQueryService).should().listByUser(eq(userId), eq(page), eq(size));
-        then(workQueryService).should().signPreviewUrlOrNull(eq(w1));
-        then(workQueryService).shouldHaveNoMoreInteractions();
-    }
+                // when/then
+                mvc.perform(get("/api/works")
+                                .param("page", String.valueOf(page))
+                                .param("size", String.valueOf(size))
+                                .accept(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                // 응답 본문에 서명 URL 일부가 포함되는지만 느슨하게 확인
+                                .andExpect(content().string(containsString("signed.example")))
+                                // Page 직렬화 시 content 배열이 포함되는지 확인 (Spring의 기본 Jackson 직렬화)
+                                .andExpect(content().string(containsString("content")));
 
-    // ---------- GET /api/works/{id}?userId=... ----------
-    @Test
-    @DisplayName("GET /api/works/{id} - 단건 조회: service로 가져오고 서명 URL 포함하여 200 OK")
-    void get_ok() throws Exception {
-        Long id = 10L;
-        Long userId = 1L;
+                // 서비스 호출 검증
+                then(workQueryService).should().listByUser(eq(userId), eq(page), eq(size));
+                then(workQueryService).should().signPreviewUrlOrNull(eq(w1));
+                then(workQueryService).shouldHaveNoMoreInteractions();
+        }
 
-        // given
-        Work w = makeWork(id, userId, "target", "https://blob/works/10/preview.png");
-        given(workQueryService.getOrThrow(eq(id), eq(userId))).willReturn(w);
-        given(workQueryService.signPreviewUrlOrNull(eq(w)))
-                .willReturn("https://signed.example/works/10/preview.png?sig=xyz");
+        // ---------- GET /api/works/{id}?userId=... ----------
+        @Test
+        @DisplayName("GET /api/works/{id} - 단건 조회: service로 가져오고 서명 URL 포함하여 200 OK")
+        void get_ok() throws Exception {
+                Long id = 10L;
+                Long userId = 1L;
 
-        // when/then
-        mvc.perform(get("/api/works/{id}", id)
-                        .param("userId", String.valueOf(userId))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                // 응답에 서명 URL 일부가 들어있는지만 확인
-                .andExpect(content().string(containsString("signed.example")));
+                // given
+                Work w = makeWork(id, userId, "target", "https://blob/works/10/preview.png");
+                given(workQueryService.getOrThrow(eq(id), eq(userId))).willReturn(w);
+                given(workQueryService.signPreviewUrlOrNull(eq(w)))
+                                .willReturn("https://signed.example/works/10/preview.png?sig=xyz");
 
-        then(workQueryService).should().getOrThrow(eq(id), eq(userId));
-        then(workQueryService).should().signPreviewUrlOrNull(eq(w));
-        then(workQueryService).shouldHaveNoMoreInteractions();
-    }
+                // when/then
+                mvc.perform(get("/api/works/{id}", id)
+                                .accept(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                // 응답에 서명 URL 일부가 들어있는지만 확인
+                                .andExpect(content().string(containsString("signed.example")));
 
-    @Test
-    @DisplayName("GET /api/works/{id} - userId 없이도 조회 가능(서비스는 null로 전달)")
-    void get_ok_without_userId() throws Exception {
-        Long id = 11L;
+                then(workQueryService).should().getOrThrow(eq(id), eq(userId));
+                then(workQueryService).should().signPreviewUrlOrNull(eq(w));
+                then(workQueryService).shouldHaveNoMoreInteractions();
+        }
 
-        Work w = makeWork(id, 99L, "noUserParam", "https://blob/works/11/preview.png");
-        given(workQueryService.getOrThrow(eq(id), isNull())).willReturn(w);
-        given(workQueryService.signPreviewUrlOrNull(eq(w)))
-                .willReturn("https://signed.example/works/11/preview.png?sig=uvw");
+        @Test
+        @DisplayName("GET /api/works/{id}/preset - preset 공개 조회")
+        void get_preset_public() throws Exception {
+                Long id = 50L;
+                Work w = makeWork(id, 2L, "preset", "https://blob/works/50/preview.png");
+                // controller calls workQueryService.getPreset(id)
+                given(workQueryService.getPreset(eq(id))).willReturn(w);
 
-        mvc.perform(get("/api/works/{id}", id).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("signed.example")));
+                mvc.perform(get("/api/works/{id}/preset", id)
+                                .accept(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string(containsString("\"id\":50")));
 
-        then(workQueryService).should().getOrThrow(eq(id), isNull());
-        then(workQueryService).should().signPreviewUrlOrNull(eq(w));
-        then(workQueryService).shouldHaveNoMoreInteractions();
-    }
+                then(workQueryService).should().getPreset(eq(id));
+                then(workQueryService).shouldHaveNoMoreInteractions();
+        }
 }

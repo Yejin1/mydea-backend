@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,8 +29,10 @@ public class WorkQueryController {
     public ResponseEntity<Page<WorkListItemResponse>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            Authentication auth
-    ) {
+            Authentication auth) {
+        if (auth == null) {
+            auth = SecurityContextHolder.getContext().getAuthentication();
+        }
         if (auth == null || !auth.isAuthenticated()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated");
         }
@@ -40,17 +43,21 @@ public class WorkQueryController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid principal");
         }
         Page<Work> result = workQueryService.listByUser(userId, page, size);
-        Page<WorkListItemResponse> mapped = result.map(w ->
-                WorkListItemResponse.of(w, workQueryService.signPreviewUrlOrNull(w)));
+        Page<WorkListItemResponse> mapped = result
+                .map(w -> WorkListItemResponse.of(w, workQueryService.signPreviewUrlOrNull(w)));
         return ResponseEntity.ok(mapped);
     }
+
     /**
      * 작업물 상세(설정값)
      * GET /api/works/{id}?userId=1
      */
     @GetMapping("/{id}")
     public ResponseEntity<WorkSettingsResponse> get(@PathVariable Long id,
-                                                    Authentication auth) {
+            Authentication auth) {
+        if (auth == null) {
+            auth = SecurityContextHolder.getContext().getAuthentication();
+        }
         if (auth == null || !auth.isAuthenticated()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated");
         }
