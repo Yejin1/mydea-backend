@@ -1,7 +1,8 @@
 package com.mydea.mydea_backend.order.service;
 
-
 import com.mydea.mydea_backend.cart.domain.CartItem;
+import com.mydea.mydea_backend.cart.domain.Cart;
+import com.mydea.mydea_backend.cart.repo.CartRepository;
 import com.mydea.mydea_backend.cart.repo.CartItemRepository;
 import com.mydea.mydea_backend.order.dto.*;
 import com.mydea.mydea_backend.order.domain.*;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderService {
     private final CartItemRepository cartItemRepository;
+    private final CartRepository cartRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
@@ -28,8 +30,16 @@ public class OrderService {
     private final ShippingCalculator shippingCalculator;
 
     public OrderPreviewResponse preview(Long cartId) {
+        // 소유자 검증 불가: preview 호출자는 SecurityContext 기반으로 controller에서 userId 전달해야 함
+        // 여기서는 cartId만 넘어오므로 사용자 소유 검증은 controller 층에서 userId와 함께 넘겨오는 구조로 바꿔도 됨
+        // (현재 controller는 cartId만 받으므로 보안을 위해 미리 소유자 조회/검증 로직 추가)
+        Cart cart = cartRepository.findById(cartId)
+                .orElseThrow(() -> new NoSuchElementException("장바구니를 찾을 수 없습니다."));
+        if (cart.isExpired())
+            throw new IllegalStateException("만료된 장바구니입니다.");
         List<CartItem> cartItems = cartItemRepository.findByCartId(cartId);
-        if (cartItems.isEmpty()) throw new IllegalStateException("장바구니가 비어있습니다.");
+        if (cartItems.isEmpty())
+            throw new IllegalStateException("장바구니가 비어있습니다.");
         int subtotal = cartItems.stream().mapToInt(ci -> ci.getUnitPrice() * ci.getQuantity()).sum();
         int shipping = shippingCalculator.calcShippingFee(subtotal);
         int discount = 0;
@@ -55,11 +65,21 @@ public class OrderService {
     public OrderResponse create(Long accountId, String idempotencyKey, OrderCreateRequest req) {
         if (idempotencyKey != null) {
             Optional<Order> existed = orderRepository.findByIdempotencyKey(idempotencyKey);
-            if (existed.isPresent()) return toResponse(existed.get());
+            if (existed.isPresent())
+                return toResponse(existed.get());
         }
 
+        // cart 소유자 및 만료 검증
+        Cart cart = cartRepository.findById(req.getCartId())
+                .orElseThrow(() -> new NoSuchElementException("장바구니를 찾을 수 없습니다."));
+        if (!Objects.equals(cart.getUserId(), accountId))
+            throw new SecurityException("권한이 없습니다.");
+        if (cart.isExpired())
+            throw new IllegalStateException("만료된 장바구니입니다.");
+
         List<CartItem> cartItems = cartItemRepository.findByCartId(req.getCartId());
-        if (cartItems.isEmpty()) throw new IllegalStateException("장바구니가 비어있습니다.");
+        if (cartItems.isEmpty())
+            throw new IllegalStateException("장바구니가 비어있습니다.");
 
         int subtotal = cartItems.stream().mapToInt(ci -> ci.getUnitPrice() * ci.getQuantity()).sum();
         int shipping = shippingCalculator.calcShippingFee(subtotal);
@@ -156,7 +176,8 @@ public class OrderService {
                 .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
         assertOwner(accountId, order);
 
-        if (!(order.getStatus() == OrderStatus.PAYMENT_PENDING || order.getStatus() == OrderStatus.CREATED || order.getStatus() == OrderStatus.PAID)) {
+        if (!(order.getStatus() == OrderStatus.PAYMENT_PENDING || order.getStatus() == OrderStatus.CREATED
+                || order.getStatus() == OrderStatus.PAID)) {
             throw new IllegalStateException("취소할 수 없는 상태입니다.");
         }
         OrderStatus from = order.getStatus();
