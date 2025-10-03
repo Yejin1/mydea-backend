@@ -83,5 +83,3 @@ CREATE TABLE IF NOT EXISTS `order_event` (
   CONSTRAINT `fk_order_event_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`order_id`) ON DELETE CASCADE
   -- CHECK (`to_status` IN ('CREATED','PAYMENT_PENDING','PAID','PROCESSING','PACKED','SHIPPED','DELIVERED','COMPLETED','CANCELED','EXPIRED','PAYMENT_FAILED'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- End of V7__order_tables.sql
