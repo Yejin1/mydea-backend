@@ -16,6 +16,7 @@ public class AccountProfileResponse {
     private String email;
     private boolean emailVerified;
     private String name;
+    private String nickname;
     private String phone;
     private boolean phoneVerified;
     private Role role;
@@ -30,6 +31,7 @@ public class AccountProfileResponse {
                 .email(a.getEmail())
                 .emailVerified(a.isEmailVerified())
                 .name(a.getName())
+                .nickname(a.getNickname())
                 .phone(a.getPhone())
                 .phoneVerified(a.isPhoneVerified())
                 .role(a.getRole())

@@ -27,6 +27,8 @@ public class AccountService {
 
         if (req.getName() != null)
             a.setName(req.getName());
+        if (req.getNickname() != null)
+            a.setNickname(req.getNickname());
         if (req.getPhone() != null)
             a.setPhone(req.getPhone());
 

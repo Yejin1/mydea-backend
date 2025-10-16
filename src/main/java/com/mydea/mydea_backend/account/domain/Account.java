@@ -14,21 +14,18 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Getter @Setter
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-@Table(
-        name = "users",
-        indexes = {
-                @Index(name = "idx_users_created_at", columnList = "created_at")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_users_login_id", columnNames = {"login_id"})
-        }
-)
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_created_at", columnList = "created_at")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_login_id", columnNames = { "login_id" })
+})
 public class Account {
 
     @Id
@@ -57,6 +54,10 @@ public class Account {
     @Size(max = 100)
     @Column(name = "name", length = 100)
     private String name;
+
+    @Size(max = 50)
+    @Column(name = "nickname", length = 50)
+    private String nickname;
 
     @Size(max = 30)
     @Column(name = "phone", length = 30)
@@ -111,7 +112,9 @@ public class Account {
     /** 기본값 세팅 */
     @PrePersist
     void prePersist() {
-        if (this.role == null) this.role = Role.USER;
-        if (this.status == null) this.status = AccountStatus.ACTIVE;
+        if (this.role == null)
+            this.role = Role.USER;
+        if (this.status == null)
+            this.status = AccountStatus.ACTIVE;
     }
 }
