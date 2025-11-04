@@ -1,5 +1,7 @@
 package com.mydea.mydea_backend.order.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mydea.mydea_backend.cart.domain.CartItem;
 import com.mydea.mydea_backend.cart.domain.Cart;
 import com.mydea.mydea_backend.cart.repo.CartRepository;
@@ -7,12 +9,18 @@ import com.mydea.mydea_backend.cart.repo.CartItemRepository;
 import com.mydea.mydea_backend.order.dto.*;
 import com.mydea.mydea_backend.order.domain.*;
 import com.mydea.mydea_backend.order.repo.*;
+import com.mydea.mydea_backend.reliability.idempotency.IdempotencyRecord;
+import com.mydea.mydea_backend.reliability.idempotency.IdempotencyService;
+import com.mydea.mydea_backend.reliability.idempotency.IdempotencyStatus;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -28,6 +36,8 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final OrderEventRepository orderEventRepository;
     private final ShippingCalculator shippingCalculator;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
     public OrderPreviewResponse preview(Long cartId) {
         // 소유자 검증 불가: preview 호출자는 SecurityContext 기반으로 controller에서 userId 전달해야 함
@@ -63,10 +73,19 @@ public class OrderService {
 
     @Transactional
     public OrderResponse create(Long accountId, String idempotencyKey, OrderCreateRequest req) {
+        String endpoint = "orders:create";
+        String requestHash = null;
         if (idempotencyKey != null) {
-            Optional<Order> existed = orderRepository.findByIdempotencyKey(idempotencyKey);
-            if (existed.isPresent())
-                return toResponse(existed.get());
+            requestHash = hashRequest(req);
+            IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
+                    LocalDateTime.now().plusMinutes(10));
+            if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
+                try {
+                    return objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
+                } catch (JsonProcessingException e) {
+                    // 스냅샷 파싱 실패 시 정상 플로우로 진행
+                }
+            }
         }
 
         // cart 소유자 및 만료 검증
@@ -119,11 +138,32 @@ public class OrderService {
         // 이벤트 로그
         saveEvent(order.getOrderId(), null, OrderStatus.PAYMENT_PENDING, "ORDER_CREATED", null);
 
-        return toResponse(order);
+        OrderResponse res = toResponse(order);
+        if (idempotencyKey != null) {
+            try {
+                idempotencyService.complete(idempotencyKey, objectMapper.writeValueAsString(res));
+            } catch (JsonProcessingException e) {
+                // ignore snapshot failure
+            }
+        }
+        return res;
     }
 
     @Transactional
-    public OrderResponse paySimulator(Long accountId, Long orderId, PayRequest req) {
+    public OrderResponse paySimulator(Long accountId, Long orderId, String idempotencyKey, PayRequest req) {
+        String endpoint = "orders:pay";
+        if (idempotencyKey != null) {
+            String requestHash = hashString(orderId + "|" + safeJson(req));
+            IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
+                    LocalDateTime.now().plusMinutes(10));
+            if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
+                try {
+                    return objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
+                } catch (JsonProcessingException e) {
+                    // continue to normal flow
+                }
+            }
+        }
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
         assertOwner(accountId, order);
@@ -155,7 +195,14 @@ public class OrderService {
             saveEvent(order.getOrderId(), from, OrderStatus.PAYMENT_FAILED, "PAYMENT_FAILED", null);
         }
 
-        return toResponse(order);
+        OrderResponse res = toResponse(order);
+        if (idempotencyKey != null) {
+            try {
+                idempotencyService.complete(idempotencyKey, safeJson(res));
+            } catch (Exception ignore) {
+            }
+        }
+        return res;
     }
 
     public OrderResponse get(Long accountId, Long orderId) {
@@ -241,5 +288,31 @@ public class OrderService {
                         .lineTotal(oi.getLineTotal())
                         .build()).collect(Collectors.toList()))
                 .build();
+    }
+
+    private String safeJson(Object o) {
+        try {
+            return objectMapper.writeValueAsString(o);
+        } catch (JsonProcessingException e) {
+            return "";
+        }
+    }
+
+    private String hashRequest(Object req) {
+        return hashString(safeJson(req));
+    }
+
+    private String hashString(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("해시 계산 실패", e);
+        }
     }
 }

@@ -214,7 +214,7 @@ class OrderControllerTest {
                 OrderResponse paidResp = response(orderId, OrderStatus.PAID, List.of(
                                 item(1L, 10L, 10000, 2)));
 
-                given(orderService.paySimulator(eq(1L), eq(orderId), any(PayRequest.class)))
+                given(orderService.paySimulator(eq(1L), eq(orderId), isNull(), any(PayRequest.class)))
                                 .willReturn(paidResp);
 
                 mvc.perform(post("/api/orders/{id}/pay", orderId)
@@ -226,7 +226,7 @@ class OrderControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.status").value("PAID"));
 
-                then(orderService).should().paySimulator(eq(1L), eq(orderId), any(PayRequest.class));
+                then(orderService).should().paySimulator(eq(1L), eq(orderId), isNull(), any(PayRequest.class));
         }
 
         @Test

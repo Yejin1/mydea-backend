@@ -6,15 +6,18 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-@Getter @Setter
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor @AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "payment", indexes = {
         @Index(name = "idx_payment_order", columnList = "order_id")
 })
 public class Payment {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "payment_id")
     private Long paymentId;
 
@@ -36,6 +39,9 @@ public class Payment {
 
     @Column(name = "provider_tx_id", length = 64)
     private String providerTxId;
+
+    @Column(name = "provider_idempotency_key", length = 64)
+    private String providerIdempotencyKey;
 
     @Lob
     @Column(name = "raw_callback")

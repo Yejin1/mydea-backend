@@ -63,9 +63,10 @@ public class OrderController {
     // 결제진행
     @PostMapping("/{orderId}/pay")
     public ResponseEntity<OrderResponse> pay(Authentication auth, @PathVariable Long orderId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idemKey,
             @RequestBody PayRequest req) {
         Long userId = Long.valueOf(auth.getName());
-        return ResponseEntity.ok(orderService.paySimulator(userId, orderId, req));
+        return ResponseEntity.ok(orderService.paySimulator(userId, orderId, idemKey, req));
     }
 
     // 주문 상세 내역 보기
