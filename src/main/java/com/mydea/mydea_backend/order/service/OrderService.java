@@ -12,6 +12,7 @@ import com.mydea.mydea_backend.order.repo.*;
 import com.mydea.mydea_backend.reliability.idempotency.IdempotencyRecord;
 import com.mydea.mydea_backend.reliability.idempotency.IdempotencyService;
 import com.mydea.mydea_backend.reliability.idempotency.IdempotencyStatus;
+import com.mydea.mydea_backend.order.log.OrderAttemptLogService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,12 +33,13 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CartRepository cartRepository;
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
+    // OrderItemRepository는 cascade 저장으로 직접 호출이 필요 없어 제거
     private final PaymentRepository paymentRepository;
     private final OrderEventRepository orderEventRepository;
     private final ShippingCalculator shippingCalculator;
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
+    private final OrderAttemptLogService attemptLogService;
 
     public OrderPreviewResponse preview(Long cartId) {
         // 소유자 검증 불가: preview 호출자는 SecurityContext 기반으로 controller에서 userId 전달해야 함
@@ -74,135 +76,157 @@ public class OrderService {
     @Transactional
     public OrderResponse create(Long accountId, String idempotencyKey, OrderCreateRequest req) {
         String endpoint = "orders:create";
-        String requestHash = null;
-        if (idempotencyKey != null) {
-            requestHash = hashRequest(req);
-            IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
-                    LocalDateTime.now().plusMinutes(10));
-            if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
-                try {
-                    return objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
-                } catch (JsonProcessingException e) {
-                    // 스냅샷 파싱 실패 시 정상 플로우로 진행
+        String requestJson = safeJson(req);
+        String requestHash = hashString(requestJson);
+        String orderNo = generateOrderNo();
+        Long attemptId = attemptLogService.start(endpoint, idempotencyKey, accountId, orderNo, null, requestHash,
+                requestJson);
+        try {
+            if (idempotencyKey != null) {
+                IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
+                        LocalDateTime.now().plusMinutes(10));
+                if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
+                    try {
+                        OrderResponse cached = objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
+                        attemptLogService.success(attemptId, r.getResponseSnapshot());
+                        return cached;
+                    } catch (JsonProcessingException e) {
+                        // 스냅샷 파싱 실패 시 정상 플로우로 진행
+                    }
                 }
             }
-        }
 
-        // cart 소유자 및 만료 검증
-        Cart cart = cartRepository.findById(req.getCartId())
-                .orElseThrow(() -> new NoSuchElementException("장바구니를 찾을 수 없습니다."));
-        if (!Objects.equals(cart.getUserId(), accountId))
-            throw new SecurityException("권한이 없습니다.");
-        if (cart.isExpired())
-            throw new IllegalStateException("만료된 장바구니입니다.");
+            // cart 소유자 및 만료 검증
+            Cart cart = cartRepository.findById(req.getCartId())
+                    .orElseThrow(() -> new NoSuchElementException("장바구니를 찾을 수 없습니다."));
+            if (!Objects.equals(cart.getUserId(), accountId))
+                throw new SecurityException("권한이 없습니다.");
+            if (cart.isExpired())
+                throw new IllegalStateException("만료된 장바구니입니다.");
 
-        List<CartItem> cartItems = cartItemRepository.findByCartId(req.getCartId());
-        if (cartItems.isEmpty())
-            throw new IllegalStateException("장바구니가 비어있습니다.");
+            List<CartItem> cartItems = cartItemRepository.findByCartId(req.getCartId());
+            if (cartItems.isEmpty())
+                throw new IllegalStateException("장바구니가 비어있습니다.");
 
-        int subtotal = cartItems.stream().mapToInt(ci -> ci.getUnitPrice() * ci.getQuantity()).sum();
-        int shipping = shippingCalculator.calcShippingFee(subtotal);
-        int discount = 0;
-        int total = subtotal + shipping - discount;
+            int subtotal = cartItems.stream().mapToInt(ci -> ci.getUnitPrice() * ci.getQuantity()).sum();
+            int shipping = shippingCalculator.calcShippingFee(subtotal);
+            int discount = 0;
+            int total = subtotal + shipping - discount;
 
-        Order order = Order.builder()
-                .orderNo(generateOrderNo())
-                .accountId(accountId)
-                .status(OrderStatus.PAYMENT_PENDING)
-                .subtotalAmount(subtotal)
-                .shippingFee(shipping)
-                .discountAmount(discount)
-                .totalAmount(total)
-                .recipientName(req.getRecipientName())
-                .phone(req.getPhone())
-                .address1(req.getAddress1())
-                .address2(req.getAddress2())
-                .zipcode(req.getZipcode())
-                .note(req.getNote())
-                .idempotencyKey(idempotencyKey)
-                .build();
+            Order order = Order.builder()
+                    .orderNo(orderNo)
+                    .accountId(accountId)
+                    .status(OrderStatus.PAYMENT_PENDING)
+                    .subtotalAmount(subtotal)
+                    .shippingFee(shipping)
+                    .discountAmount(discount)
+                    .totalAmount(total)
+                    .recipientName(req.getRecipientName())
+                    .phone(req.getPhone())
+                    .address1(req.getAddress1())
+                    .address2(req.getAddress2())
+                    .zipcode(req.getZipcode())
+                    .note(req.getNote())
+                    .idempotencyKey(idempotencyKey)
+                    .build();
 
-        for (CartItem ci : cartItems) {
-            order.addItem(OrderItem.builder()
-                    .workId(ci.getWorkId())
-                    .optionHash(ci.getOptionHash())
-                    .name(ci.getName())
-                    .thumbUrl(ci.getThumbUrl())
-                    .unitPrice(ci.getUnitPrice())
-                    .quantity(ci.getQuantity())
-                    .lineTotal(ci.getUnitPrice() * ci.getQuantity())
-                    .build());
-        }
-        order = orderRepository.save(order);
-
-        // 이벤트 로그
-        saveEvent(order.getOrderId(), null, OrderStatus.PAYMENT_PENDING, "ORDER_CREATED", null);
-
-        OrderResponse res = toResponse(order);
-        if (idempotencyKey != null) {
-            try {
-                idempotencyService.complete(idempotencyKey, objectMapper.writeValueAsString(res));
-            } catch (JsonProcessingException e) {
-                // ignore snapshot failure
+            for (CartItem ci : cartItems) {
+                order.addItem(OrderItem.builder()
+                        .workId(ci.getWorkId())
+                        .optionHash(ci.getOptionHash())
+                        .name(ci.getName())
+                        .thumbUrl(ci.getThumbUrl())
+                        .unitPrice(ci.getUnitPrice())
+                        .quantity(ci.getQuantity())
+                        .lineTotal(ci.getUnitPrice() * ci.getQuantity())
+                        .build());
             }
+            order = orderRepository.save(order);
+
+            // 이벤트 로그
+            saveEvent(order.getOrderId(), null, OrderStatus.PAYMENT_PENDING, "ORDER_CREATED", null);
+
+            OrderResponse res = toResponse(order);
+            if (idempotencyKey != null) {
+                try {
+                    idempotencyService.complete(idempotencyKey, objectMapper.writeValueAsString(res));
+                } catch (JsonProcessingException e) {
+                    // ignore snapshot failure
+                }
+            }
+            attemptLogService.success(attemptId, safeJson(res));
+            return res;
+        } catch (Exception e) {
+            attemptLogService.fail(attemptId, e.getMessage(), null);
+            throw e;
         }
-        return res;
     }
 
     @Transactional
     public OrderResponse paySimulator(Long accountId, Long orderId, String idempotencyKey, PayRequest req) {
         String endpoint = "orders:pay";
-        if (idempotencyKey != null) {
-            String requestHash = hashString(orderId + "|" + safeJson(req));
-            IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
-                    LocalDateTime.now().plusMinutes(10));
-            if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
-                try {
-                    return objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
-                } catch (JsonProcessingException e) {
-                    // continue to normal flow
+        String requestJson = safeJson(req);
+        String requestHash = hashString(orderId + "|" + requestJson);
+        Long attemptId = attemptLogService.start(endpoint, idempotencyKey, accountId, null, orderId, requestHash,
+                requestJson);
+        try {
+            if (idempotencyKey != null) {
+                IdempotencyRecord r = idempotencyService.begin(idempotencyKey, endpoint, accountId, requestHash,
+                        LocalDateTime.now().plusMinutes(10));
+                if (r.getStatus() == IdempotencyStatus.COMPLETED && r.getResponseSnapshot() != null) {
+                    try {
+                        OrderResponse cached = objectMapper.readValue(r.getResponseSnapshot(), OrderResponse.class);
+                        attemptLogService.success(attemptId, r.getResponseSnapshot());
+                        return cached;
+                    } catch (JsonProcessingException e) {
+                        // continue to normal flow
+                    }
                 }
             }
-        }
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
-        assertOwner(accountId, order);
-        if (order.getStatus() != OrderStatus.PAYMENT_PENDING)
-            throw new IllegalStateException("결제 가능한 상태가 아닙니다.");
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
+            assertOwner(accountId, order);
+            if (order.getStatus() != OrderStatus.PAYMENT_PENDING)
+                throw new IllegalStateException("결제 가능한 상태가 아닙니다.");
 
-        Payment payment = Payment.builder()
-                .orderId(order.getOrderId())
-                .status(req.isSuccess() ? PaymentStatus.PAID : PaymentStatus.FAILED)
-                .method(Objects.requireNonNullElse(req.getMethod(), "SIMULATOR"))
-                .amount(order.getTotalAmount())
-                .provider("MOCK")
-                .providerTxId(UUID.randomUUID().toString())
-                .approvedAt(req.isSuccess() ? LocalDateTime.now() : null)
-                .rawCallback("{\"simulated\":true}")
-                .build();
-        paymentRepository.save(payment);
+            Payment payment = Payment.builder()
+                    .orderId(order.getOrderId())
+                    .status(req.isSuccess() ? PaymentStatus.PAID : PaymentStatus.FAILED)
+                    .method(Objects.requireNonNullElse(req.getMethod(), "SIMULATOR"))
+                    .amount(order.getTotalAmount())
+                    .provider("MOCK")
+                    .providerTxId(UUID.randomUUID().toString())
+                    .approvedAt(req.isSuccess() ? LocalDateTime.now() : null)
+                    .rawCallback("{\"simulated\":true}")
+                    .build();
+            paymentRepository.save(payment);
 
-        if (req.isSuccess()) {
-            OrderStatus from = order.getStatus();
-            order.setStatus(OrderStatus.PAID);
-            order.setPaidAt(LocalDateTime.now());
-            orderRepository.save(order);
-            saveEvent(order.getOrderId(), from, OrderStatus.PAID, "PAYMENT_SUCCESS", null);
-        } else {
-            OrderStatus from = order.getStatus();
-            order.setStatus(OrderStatus.PAYMENT_FAILED);
-            orderRepository.save(order);
-            saveEvent(order.getOrderId(), from, OrderStatus.PAYMENT_FAILED, "PAYMENT_FAILED", null);
-        }
-
-        OrderResponse res = toResponse(order);
-        if (idempotencyKey != null) {
-            try {
-                idempotencyService.complete(idempotencyKey, safeJson(res));
-            } catch (Exception ignore) {
+            if (req.isSuccess()) {
+                OrderStatus from = order.getStatus();
+                order.setStatus(OrderStatus.PAID);
+                order.setPaidAt(LocalDateTime.now());
+                orderRepository.save(order);
+                saveEvent(order.getOrderId(), from, OrderStatus.PAID, "PAYMENT_SUCCESS", null);
+            } else {
+                OrderStatus from = order.getStatus();
+                order.setStatus(OrderStatus.PAYMENT_FAILED);
+                orderRepository.save(order);
+                saveEvent(order.getOrderId(), from, OrderStatus.PAYMENT_FAILED, "PAYMENT_FAILED", null);
             }
+
+            OrderResponse res = toResponse(order);
+            if (idempotencyKey != null) {
+                try {
+                    idempotencyService.complete(idempotencyKey, safeJson(res));
+                } catch (Exception ignore) {
+                }
+            }
+            attemptLogService.success(attemptId, safeJson(res));
+            return res;
+        } catch (Exception e) {
+            attemptLogService.fail(attemptId, e.getMessage(), null);
+            throw e;
         }
-        return res;
     }
 
     public OrderResponse get(Long accountId, Long orderId) {
@@ -296,10 +320,6 @@ public class OrderService {
         } catch (JsonProcessingException e) {
             return "";
         }
-    }
-
-    private String hashRequest(Object req) {
-        return hashString(safeJson(req));
     }
 
     private String hashString(String s) {
