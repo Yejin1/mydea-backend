@@ -17,7 +17,7 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxes;
     private final OutboxDispatcher dispatcher;
 
-    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
+    @Scheduled(fixedDelay = 30000, initialDelay = 30000)
     public void pollAndPublish() {
         var page = outboxes.findPending(OutboxStatus.PENDING, LocalDateTime.now(), PageRequest.of(0, 20));
         page.forEach(e -> {
