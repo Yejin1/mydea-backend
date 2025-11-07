@@ -41,16 +41,13 @@ public class CartService {
     public CartRes getCart(Long userId) {
         Cart cart = cartRepository.findByUserIdAndVirtualCartFalse(userId).orElse(null);
         if (cart == null)
-            return new CartRes(List.of(), 0, 0);
+            return new CartRes(null, List.of(), 0, 0);
 
         List<CartItem> items = itemRepository.findByCartId(cart.getCartId());
-
         if (items.isEmpty()) {
-            return new CartRes(List.of(), 0, 0);
+            return new CartRes(cart.getCartId(), List.of(), 0, 0);
         }
-
-        int total = items.stream().mapToInt(i -> i.getUnitPrice() * i.getQuantity()).sum();
-        return CartMapper.toCartRes(items);
+        return CartMapper.toCartRes(cart.getCartId(), items);
     }
 
     // 장바구니

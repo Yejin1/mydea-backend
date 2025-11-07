@@ -4,7 +4,8 @@ import com.mydea.mydea_backend.cart.domain.CartItem;
 import java.util.List;
 
 public final class CartMapper {
-    private CartMapper() {}
+    private CartMapper() {
+    }
 
     public static CartItemRes toRes(CartItem e) {
         int line = (e.getUnitPrice() == null ? 0 : e.getUnitPrice()) * (e.getQuantity() == null ? 0 : e.getQuantity());
@@ -16,13 +17,12 @@ public final class CartMapper {
                 e.getThumbUrl(),
                 e.getUnitPrice() == null ? 0 : e.getUnitPrice(),
                 e.getQuantity() == null ? 0 : e.getQuantity(),
-                line
-        );
+                line);
     }
 
-    public static CartRes toCartRes(List<CartItem> items) {
+    public static CartRes toCartRes(Long cartId, List<CartItem> items) {
         var itemDtos = items.stream().map(CartMapper::toRes).toList();
         int total = itemDtos.stream().mapToInt(CartItemRes::lineTotal).sum();
-        return new CartRes(itemDtos, total, itemDtos.size());
+        return new CartRes(cartId, itemDtos, total, itemDtos.size());
     }
 }
