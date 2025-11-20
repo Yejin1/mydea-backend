@@ -14,6 +14,7 @@ import com.mydea.mydea_backend.reliability.idempotency.IdempotencyService;
 import com.mydea.mydea_backend.reliability.idempotency.IdempotencyStatus;
 import com.mydea.mydea_backend.order.log.OrderAttemptLogService;
 import jakarta.transaction.Transactional;
+import com.mydea.mydea_backend.production.service.CapacityBatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +41,7 @@ public class OrderService {
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
     private final OrderAttemptLogService attemptLogService;
+    private final CapacityBatchService capacityBatchService;
 
     public OrderPreviewResponse preview(Long cartId) {
         // 소유자 검증 불가: preview 호출자는 SecurityContext 기반으로 controller에서 userId 전달해야 함
@@ -75,6 +77,8 @@ public class OrderService {
 
     @Transactional
     public OrderResponse create(Long accountId, String idempotencyKey, OrderCreateRequest req) {
+        // 주문 시점에 다음주 일일 작업용량 준비가 누락된 경우 대비
+        capacityBatchService.createNextWeekCapacityIfNotExists();
         String endpoint = "orders:create";
         String requestJson = safeJson(req);
         String requestHash = hashString(requestJson);
