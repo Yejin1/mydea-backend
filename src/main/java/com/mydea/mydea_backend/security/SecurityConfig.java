@@ -62,7 +62,8 @@ public class SecurityConfig {
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://mydea.co.kr",
-                "https://mydea-frontend-a0dferfmgacmeedy.koreasouth-01.azurewebsites.net"
+                "https://mydea-frontend-a0dferfmgacmeedy.koreasouth-01.azurewebsites.net",
+                "https://mydea-frontend-2-h4hrdefwfbd6g8bb.koreasouth-01.azurewebsites.net/"
         ));
         cfg.setAllowCredentials(true);
 

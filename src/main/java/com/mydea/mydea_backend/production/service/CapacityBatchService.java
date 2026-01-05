@@ -55,7 +55,6 @@ public class CapacityBatchService {
                     .capacityMin(capacityMin)
                     .reservedMin(0)
                     .backlogAcceptedCount(0)
-                    .version(0)
                     .build();
             capacityRepo.save(day);
         }
